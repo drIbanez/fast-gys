@@ -61,11 +61,9 @@ FileFetcher < DataParser >::FileFetcher(const QString &filePath, QObject *parent
     if (!m_file.open(QIODevice::ReadOnly))
     {
         QString err = QString("Erorr during opening: ") + m_file.errorString();
-
         throw Exception(err);
         return;
     }
-
     m_parser.setDevice(&m_file);
 }
 

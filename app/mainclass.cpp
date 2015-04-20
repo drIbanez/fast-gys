@@ -4,6 +4,7 @@
 #include <QSqlTableModel>
 #include <QAbstractItemView>
 #include <QThread>
+#include <QMessageBox>
 
 #include "mainclass.h"
 #include "mainwindow.h"
@@ -141,27 +142,42 @@ void MainClass::updateData(const QSqlRecord record)
 
 void MainClass::loadFile(const QString &filePath)
 {
-    Fetcher *fetcher = new FileFetcher< TextFileParser > (filePath);
+    try
+    {
+        Fetcher *fetcher = new FileFetcher< TextFileParser > (filePath);
+        QScopedPointer<Fetcher> ptrFetcher(fetcher);
+        QThread *fetcher_thread = new QThread;
+        QScopedPointer<QThread> ptrFetcher_Thread(fetcher_thread);
 
-    QThread *fetcher_thread = new QThread;
+        QObject::connect(fetcher, &Fetcher::send,
+                         this, &MainClass::newData);
 
-    QObject::connect(fetcher, &Fetcher::send,
-                     this, &MainClass::newData);
+        // Avoiding leaks by using 'deleteLater()' slot
+        QObject::connect(fetcher, &Fetcher::end,
+                         m_mw, &MainWindow::fileLoadingDone);
+        QObject::connect(fetcher, &Fetcher::end,
+                         fetcher_thread, &QThread::quit);
+        QObject::connect(fetcher, &Fetcher::end,
+                         fetcher, &Fetcher::deleteLater);
+        QObject::connect(fetcher, &Fetcher::end,
+                         fetcher_thread, &QThread::deleteLater);
 
-    // Avoiding leaks by using 'deleteLater()' slot
-    QObject::connect(fetcher, &Fetcher::end,
-                     m_mw, &MainWindow::fileLoadingDone);
-    QObject::connect(fetcher, &Fetcher::end,
-                     fetcher_thread, &QThread::quit);
-    QObject::connect(fetcher, &Fetcher::end,
-                     fetcher, &Fetcher::deleteLater);
-    QObject::connect(fetcher, &Fetcher::end,
-                     fetcher_thread, &QThread::deleteLater);
+        ptrFetcher->moveToThread(fetcher_thread);
+        fetcher_thread->start();
 
-    fetcher->moveToThread(fetcher_thread);
-    fetcher_thread->start();
+        QMetaObject::invokeMethod(fetcher, "start");
 
-    QMetaObject::invokeMethod(fetcher, "start");
+    }
+    catch(Exception& e)
+    {
+        QMessageBox msg;
+        msg.setText("File loading failed!");
+        //Show details button for comfortable error view
+        msg.setDetailedText(e.what());
+        msg.setStandardButtons(QMessageBox::Ok);
+        msg.setDefaultButton(QMessageBox::Ok);
+        msg.exec();
+    }
 }
 
 void MainClass::updateAll()

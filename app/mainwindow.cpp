@@ -73,9 +73,8 @@ void MainWindow::on_btnLoadFile_clicked()
 {
     LOG_ENTRY;
     QString filePath = QFileDialog::getOpenFileName(this,
-                                                    "Open text file",
+                                                    "Text file",
                                                     ".");
-
     emit requestLoadFile(filePath);
 }
 
